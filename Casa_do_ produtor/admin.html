@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin - Casa do Produtor</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: Arial, sans-serif; }
+        .navbar { background: #2d5016; padding: 1rem; display: flex; flex-wrap: wrap; gap: 1rem; }
+        .navbar a { color: white; text-decoration: none; padding: 0.5rem 1rem; }
+        .container { padding: 1rem; max-width: 800px; margin: 0 auto; }
+        .form-group { margin-bottom: 1rem; }
+        .form-group label { display: block; margin-bottom: 0.5rem; font-weight: bold; color: #2d5016; }
+        .form-group input, .form-group textarea { 
+            width: 100%; 
+            padding: 0.75rem; 
+            border: 1px solid #ddd; 
+            border-radius: 4px; 
+            font-size: 16px; 
+        }
+        .product-list { margin-top: 2rem; }
+        .product-item { 
+            border: 1px solid #ddd; 
+            padding: 1.5rem; 
+            margin-bottom: 1rem; 
+            border-radius: 8px; 
+            background: white;
+        }
+        .product-image-preview { 
+            max-width: 100%; 
+            max-height: 200px; 
+            margin: 0.5rem 0; 
+            border-radius: 5px; 
+        }
+        .delete-btn { 
+            background: #dc3545; 
+            color: white; 
+            border: none; 
+            padding: 10px 20px; 
+            border-radius: 5px; 
+            cursor: pointer; 
+            margin-top: 10px; 
+            font-size: 1rem;
+        }
+        .submit-btn { 
+            background: #28a745; 
+            color: white; 
+            padding: 15px 30px; 
+            border: none; 
+            border-radius: 8px; 
+            cursor: pointer; 
+            font-size: 1.1rem;
+            width: 100%;
+            margin-top: 1rem;
+        }
+        .sync-section { 
+            background: #e7f3ff; 
+            padding: 1rem; 
+            border-radius: 8px; 
+            margin: 2rem 0; 
+            text-align: center;
+        }
+        .sync-btn {
+            background: #17a2b8;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 0.5rem;
+            font-size: 1rem;
+        }
+        .last-sync {
+            font-size: 0.9rem;
+            color: #666;
+            margin-top: 0.5rem;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <a href="index.html">Casa</a>
+        <a href="shop.html">Comprar</a>
+        <a href="admin.html" style="margin-left: auto;">Admin</a>
+    </nav>
+
+    <div class="container">
+        <div class="sync-section">
+            <h3>🔄 Sistema GitHub - Todas as Redes</h3>
+            <p><strong>Status:</strong> <span id="syncStatus">Carregando...</span></p>
+            <p><small>Os produtos cadastrados aparecerão em TODOS os dispositivos automaticamente</small></p>
+            <div>
+                <button class="sync-btn" onclick="exportToGitHub()">📤 Exportar para GitHub</button>
+                <button class="sync-btn" onclick="importFromGitHub()">📥 Importar do GitHub</button>
+            </div>
+            <p class="last-sync" id="lastSync"></p>
+        </div>
+        
+        <h1>📦 Cadastro de Produtos</h1>
+        
+        <form id="productForm">
+            <div class="form-group">
+                <label for="productName">Nome do Produto:</label>
+                <input type="text" id="productName" placeholder="Ex: Adubo Orgânico 5kg" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="productDescription">Descrição:</label>
+                <textarea id="productDescription" placeholder="Descreva o produto..." rows="3"></textarea>
+            </div>
+            
+            <div class="form-group">
+                <label for="productPrice">Preço (R$):</label>
+                <input type="number" id="productPrice" placeholder="0.00" step="0.01" min="0" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="productImage">Imagem do Produto:</label>
+                <input type="file" id="productImage" accept="image/*">
+                <small>Selecione uma imagem do seu computador (opcional)</small>
+            </div>
+            
+            <button type="submit" class="submit-btn">✅ Cadastrar Produto</button>
+        </form>
+
+        <div class="product-list">
+            <h2>📋 Produtos Cadastrados</h2>
+            <div id="productList">
+                Carregando...
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const STORAGE_KEY = 'casa_produtor_products';
+        
+        // Verificar autenticação
+        if (!localStorage.getItem('auth')) {
+            window.location.href = 'index.html';
+        }
+
+        function updateSyncStatus(message) {
+            document.getElementById('syncStatus').textContent = message;
+        }
+
+        function updateLastSync() {
+            const now = new Date();
+            document.getElementById('lastSync').textContent = 
+                `Última sincronização: ${now.toLocaleString('pt-BR')}`;
+        }
+
+        // Exportar dados para GitHub (manual)
+        function exportToGitHub() {
+            const products = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+            const dataStr = JSON.stringify(products, null, 2);
+            const dataBlob = new Blob([dataStr], {type: 'application/json'});
+            
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(dataBlob);
+            link.download = 'produtos_casa_do_produtor.json';
+            link.click();
+            
+            updateSyncStatus('📤 Dados exportados!');
+            alert('✅ Arquivo exportado! Faça upload manual no GitHub:\n\n1. Vá no repositório "casa-do-produtor-dados"\n2. Clique em "produtos.json"\n3. Clique no lápis (Edit)\n4. Cole o conteúdo\n5. Clique "Commit changes"');
+        }
+
+        // Importar do GitHub
+        async function importFromGitHub() {
+            // 🔧 SUBSTITUA pelo SEU usuário
+            const GITHUB_USER = 'SEU_USUARIO_GITHUB_AQUI';
+            const GITHUB_URL = `https://raw.githubusercontent.com/${GITHUB_USER}/casa-do-produtor-dados/main/produtos.json`;
+            
+            try {
+                updateSyncStatus('🔄 Importando do GitHub...');
+                const response = await fetch(GITHUB_URL + '?t=' + Date.now());
+                
+                if (!response.ok) throw new Error('Erro ao importar');
+                
+                const products = await response.json();
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(products));
+                
+                loadProducts();
+                updateSyncStatus('✅ Dados importados do GitHub!');
+                updateLastSync();
+                
+            } catch (error) {
+                console.error('Erro:', error);
+                updateSyncStatus('❌ Erro ao importar do GitHub');
+            }
+        }
+
+        // Carregar produtos
+        function loadProducts() {
+            const products = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+            const list = document.getElementById('productList');
+            
+            if (products.length === 0) {
+                list.innerHTML = '<p>Nenhum produto cadastrado ainda.</p>';
+                return;
+            }
+
+            list.innerHTML = products.map((product, index) => `
+                <div class="product-item">
+                    <h3 style="color: #2d5016;">${product.name}</h3>
+                    <p>${product.description || 'Sem descrição'}</p>
+                    <p style="font-size: 1.5rem; font-weight: bold; color: #28a745;">
+                        R$ ${typeof product.price === 'number' ? product.price.toFixed(2) : '0.00'}
+                    </p>
+                    ${product.image ? `<img src="${product.image}" alt="${product.name}" class="product-image-preview">` : ''}
+                    <br>
+                    <button class="delete-btn" onclick="deleteProduct(${index})">🗑️ Excluir</button>
+                </div>
+            `).join('');
+            
+            updateSyncStatus(`✅ ${products.length} produtos locais`);
+        }
+
+        // Preview da imagem
+        document.getElementById('productImage').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            const preview = document.getElementById('imagePreview');
+            
+            if (file) {
+                if (file.size > 2 * 1024 * 1024) {
+                    alert('A imagem é muito grande! Por favor, selecione uma imagem menor que 2MB.');
+                    this.value = '';
+                    return;
+                }
+                
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    if (!preview) {
+                        const container = document.createElement('div');
+                        container.id = 'imagePreview';
+                        container.innerHTML = `<img src="${e.target.result}" class="product-image-preview" alt="Preview">`;
+                        document.querySelector('.form-group:last-child').after(container);
+                    } else {
+                        preview.innerHTML = `<img src="${e.target.result}" class="product-image-preview" alt="Preview">`;
+                    }
+                }
+                reader.readAsDataURL(file);
+            }
+        });
+
+        // Adicionar produto
+        document.getElementById('productForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const fileInput = document.getElementById('productImage');
+            const file = fileInput.files[0];
+            
+            const name = document.getElementById('productName').value.trim();
+            const price = parseFloat(document.getElementById('productPrice').value);
+            const description = document.getElementById('productDescription').value.trim();
+            
+            if (!name) {
+                alert('Por favor, informe o nome do produto.');
+                return;
+            }
+            
+            if (isNaN(price) || price < 0) {
+                alert('Por favor, informe um preço válido.');
+                return;
+            }
+            
+            const products = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+            
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const newProduct = {
+                        name: name,
+                        description: description,
+                        price: price,
+                        image: e.target.result,
+                        createdAt: new Date().toISOString()
+                    };
+                    products.push(newProduct);
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify(products));
+                    
+                    document.getElementById('productForm').reset();
+                    const preview = document.getElementById('imagePreview');
+                    if (preview) preview.remove();
+                    loadProducts();
+                    alert('✅ Produto cadastrado! Exporte para GitHub para sincronizar.');
+                }
+                reader.readAsDataURL(file);
+            } else {
+                const newProduct = {
+                    name: name,
+                    description: description,
+                    price: price,
+                    image: null,
+                    createdAt: new Date().toISOString()
+                };
+                products.push(newProduct);
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(products));
+                
+                document.getElementById('productForm').reset();
+                loadProducts();
+                alert('✅ Produto cadastrado! Exporte para GitHub para sincronizar.');
+            }
+        });
+
+        // Excluir produto
+        function deleteProduct(index) {
+            if (!confirm('Tem certeza que deseja excluir este produto?')) return;
+            
+            const products = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+            products.splice(index, 1);
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(products));
+            
+            loadProducts();
+            alert('✅ Produto excluído! Exporte para GitHub para sincronizar.');
+        }
+
+        // Carregar produtos ao iniciar
+        loadProducts();
+        updateLastSync();
+    </script>
+</body>
+</html>
